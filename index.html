@@ -138,6 +138,7 @@
   .media-btn.filled{border-style:solid;border-color:var(--grass);color:var(--ink);}
   .media-btn .glyph{font-size:22px;}
   .photo-preview{width:100%;border-radius:14px;margin-top:8px;display:block;max-height:220px;object-fit:cover;}
+  .detail-photo{width:100%;border-radius:14px;margin-top:8px;display:block;max-height:340px;object-fit:contain;background:#00000010;cursor:zoom-in;}
   .remove-media{margin-top:6px;background:none;border:none;color:#E24C6B;font-weight:800;font-size:12.5px;cursor:pointer;}
   audio{width:100%;margin-top:8px;}
   .rec-indicator{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:8px;font-weight:800;color:#E24C6B;font-size:13px;}
@@ -177,6 +178,10 @@
   .confetti-piece{position:fixed;top:-10px;width:9px;height:14px;z-index:400;pointer-events:none;animation:fall linear forwards;border-radius:2px;}
   @keyframes fall{to{transform:translateY(105vh) rotate(600deg);opacity:.9}}
 
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:700;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+  .lightbox.open{opacity:1;pointer-events:auto;}
+  .lightbox img{max-width:94vw;max-height:88vh;border-radius:10px;object-fit:contain;}
+  .lightbox-close{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:20px;cursor:pointer;}
   ::selection{background:var(--pink);color:#fff;}
   .hidden{display:none !important;}
   .onboard-lock{position:fixed;inset:0;background:var(--cream);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;}
@@ -281,7 +286,7 @@
     <div class="detail-badge" id="detailBadgeShape"></div>
     <h2 class="detail-title" id="detailTitle"></h2>
     <div class="detail-date" id="detailDate"></div>
-    <img id="detailPhoto" class="photo-preview hidden">
+    <img id="detailPhoto" class="detail-photo hidden">
     <audio id="detailAudio" class="hidden" controls></audio>
     <div class="detail-note hidden" id="detailNoteWrap"><span id="detailNote"></span></div>
     <button class="primary-btn danger" id="btnDeleteBadge">Delete this badge</button>
@@ -345,6 +350,11 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightboxClose">✕</button>
+  <img id="lightboxImg" src="">
+</div>
 
 <script>
 (function(){
@@ -604,13 +614,15 @@ function resetAddForm(){
 
 document.getElementById('btnAdd').addEventListener('click', ()=>{
   if(!activeProfileId){ toast('Add a kid profile first!'); openProfileSheet(null); return; }
-  openGate();
+  openGate(()=>{ resetAddForm(); openSheet('overlayAdd'); });
 });
 document.getElementById('closeAdd').addEventListener('click', ()=>closeSheet('overlayAdd'));
 
-/* ============ PARENT GATE (multiplication check before adding a badge) ============ */
+/* ============ PARENT GATE (multiplication check before adding/deleting) ============ */
 let gateAnswer = 0;
-function openGate(){
+let gateCallback = null;
+function openGate(onSuccess){
+  gateCallback = onSuccess;
   const a = 2 + Math.floor(Math.random()*8); // 2-9
   const b = 2 + Math.floor(Math.random()*8); // 2-9
   gateAnswer = a*b;
@@ -625,8 +637,8 @@ function checkGate(){
   if(val === '' ) { document.getElementById('gateError').textContent = 'Type an answer first'; return; }
   if(parseInt(val,10) === gateAnswer){
     closeSheet('overlayGate');
-    resetAddForm();
-    openSheet('overlayAdd');
+    const cb = gateCallback; gateCallback = null;
+    if(cb) cb();
   } else {
     document.getElementById('gateError').textContent = 'Not quite — try again!';
     const q = document.getElementById('gateQuestion');
@@ -638,7 +650,7 @@ function checkGate(){
     document.getElementById('gateAnswer').focus();
   }
 }
-document.getElementById('closeGate').addEventListener('click', ()=>closeSheet('overlayGate'));
+document.getElementById('closeGate').addEventListener('click', ()=>{ gateCallback = null; closeSheet('overlayGate'); });
 document.getElementById('btnGateSubmit').addEventListener('click', checkGate);
 document.getElementById('gateAnswer').addEventListener('keydown', (e)=>{ if(e.key==='Enter') checkGate(); });
 
@@ -752,7 +764,7 @@ function openDetail(b){
   document.getElementById('detailTitle').textContent = b.title;
   document.getElementById('detailDate').textContent = fmtDate(b.createdAt);
   const photo = document.getElementById('detailPhoto');
-  if(b.photo){ photo.src = b.photo; photo.classList.remove('hidden'); } else photo.classList.add('hidden');
+  if(b.photo){ photo.src = b.photo; photo.classList.remove('hidden'); photo.onclick = ()=>openLightbox(b.photo); } else photo.classList.add('hidden');
   const audio = document.getElementById('detailAudio');
   if(b.audio){ audio.src = b.audio; audio.classList.remove('hidden'); } else { audio.classList.add('hidden'); audio.removeAttribute('src'); }
   const noteWrap = document.getElementById('detailNoteWrap');
@@ -760,12 +772,22 @@ function openDetail(b){
   openSheet('overlayDetail');
 }
 document.getElementById('closeDetail').addEventListener('click', ()=>closeSheet('overlayDetail'));
-document.getElementById('btnDeleteBadge').addEventListener('click', async ()=>{
-  if(!confirm('Delete this badge? This cannot be undone.')) return;
-  await dbDelete('badges', detailBadgeId);
-  closeSheet('overlayDetail');
-  toast('Badge deleted');
-  await loadBadges();
+
+function openLightbox(src){
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+document.getElementById('lightboxClose').addEventListener('click', ()=> document.getElementById('lightbox').classList.remove('open'));
+document.getElementById('lightbox').addEventListener('click', (e)=>{ if(e.target.id==='lightbox') document.getElementById('lightbox').classList.remove('open'); });
+
+document.getElementById('btnDeleteBadge').addEventListener('click', ()=>{
+  openGate(async ()=>{
+    if(!confirm('Delete this badge? This cannot be undone.')) return;
+    await dbDelete('badges', detailBadgeId);
+    closeSheet('overlayDetail');
+    toast('Badge deleted');
+    await loadBadges();
+  });
 });
 
 /* ============ SETTINGS SHEET ============ */
@@ -840,13 +862,15 @@ document.getElementById('importInput').addEventListener('change', async (e)=>{
   await refreshProfilesFromDB();
 });
 
-document.getElementById('btnEraseAll').addEventListener('click', async ()=>{
-  if(!confirm('This will permanently delete every kid and badge on this device. Are you absolutely sure?')) return;
-  if(!confirm('Really erase everything? This cannot be undone.')) return;
-  await dbClear('profiles'); await dbClear('badges'); await dbClear('meta');
-  closeSheet('overlaySettings');
-  await refreshProfilesFromDB();
-  toast('All data erased');
+document.getElementById('btnEraseAll').addEventListener('click', ()=>{
+  openGate(async ()=>{
+    if(!confirm('This will permanently delete every kid and badge on this device. Are you absolutely sure?')) return;
+    if(!confirm('Really erase everything? This cannot be undone.')) return;
+    await dbClear('profiles'); await dbClear('badges'); await dbClear('meta');
+    closeSheet('overlaySettings');
+    await refreshProfilesFromDB();
+    toast('All data erased');
+  });
 });
 
 /* ============ PROFILE SHEET (create/edit) ============ */
@@ -909,15 +933,17 @@ document.getElementById('btnSaveProfile').addEventListener('click', async ()=>{
   if(!editingProfileId || activeProfileId===id){ await selectProfile(id); }
   toast(existing ? 'Profile updated' : `${name} added! 🎉`);
 });
-document.getElementById('btnDeleteProfile').addEventListener('click', async ()=>{
-  const p = profiles.find(x=>x.id===editingProfileId);
-  const kidBadges = await dbGetAllByIndex('badges','profileId',editingProfileId);
-  if(!confirm(`Delete ${p.name} and all ${kidBadges.length} of their badges? This cannot be undone.`)) return;
-  for(const b of kidBadges) await dbDelete('badges', b.id);
-  await dbDelete('profiles', editingProfileId);
-  closeSheet('overlayProfile');
-  await refreshProfilesFromDB();
-  toast(`${p.name} was removed`);
+document.getElementById('btnDeleteProfile').addEventListener('click', ()=>{
+  openGate(async ()=>{
+    const p = profiles.find(x=>x.id===editingProfileId);
+    const kidBadges = await dbGetAllByIndex('badges','profileId',editingProfileId);
+    if(!confirm(`Delete ${p.name} and all ${kidBadges.length} of their badges? This cannot be undone.`)) return;
+    for(const b of kidBadges) await dbDelete('badges', b.id);
+    await dbDelete('profiles', editingProfileId);
+    closeSheet('overlayProfile');
+    await refreshProfilesFromDB();
+    toast(`${p.name} was removed`);
+  });
 });
 document.getElementById('btnOnboardStart').addEventListener('click', ()=> openProfileSheet(null));
 
