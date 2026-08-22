@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Kudos Badges</title>
+<meta name="theme-color" content="#FF6FA5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kudos">
+<link id="favicon" rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%AD%90%3C/text%3E%3C/svg%3E">
+<link id="manifest-link" rel="manifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FFFBF3;
+    --ink:#2E3552;
+    --ink-soft:#6B7290;
+    --sun:#FFC93C;
+    --pink:#FF6FA5;
+    --sky:#4FC3F7;
+    --grass:#6BCB77;
+    --grape:#9B72CF;
+    --coral:#FF7A59;
+    --card:#FFFFFF;
+    --radius:22px;
+    --shadow: 0 8px 24px rgba(46,53,82,.12);
+    --shadow-lg: 0 16px 40px rgba(46,53,82,.22);
+    font-family:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI Rounded','Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:var(--cream);color:var(--ink);overflow-x:hidden;}
+  body{
+    background-image:
+      radial-gradient(circle at 8% 12%, rgba(255,201,60,.20) 0, transparent 40%),
+      radial-gradient(circle at 92% 18%, rgba(255,111,165,.18) 0, transparent 42%),
+      radial-gradient(circle at 20% 90%, rgba(79,195,247,.16) 0, transparent 40%),
+      radial-gradient(circle at 85% 85%, rgba(107,203,119,.16) 0, transparent 40%);
+    background-attachment:fixed;
+    min-height:100dvh;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  h1,h2,h3,.display{font-family:'Fredoka',sans-serif;}
+  button{font-family:inherit;}
+  .app{max-width:560px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;position:relative;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{padding:calc(env(safe-area-inset-top) + 14px) 16px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .brand{display:flex;align-items:center;gap:8px;}
+  .brand-emoji{font-size:28px;transform:rotate(-8deg);display:inline-block;}
+  .brand h1{font-size:22px;margin:0;font-weight:700;letter-spacing:.2px;color:var(--ink);}
+  .icon-btn{width:42px;height:42px;border-radius:14px;border:none;background:#FFFFFFcc;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;transition:transform .15s ease;}
+  .icon-btn:active{transform:scale(.9);}
+
+  /* ---------- Profile tabs ---------- */
+  .profiles-row{display:flex;gap:10px;padding:6px 16px 14px;overflow-x:auto;scrollbar-width:none;}
+  .profiles-row::-webkit-scrollbar{display:none;}
+  .profile-chip{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;opacity:.55;transition:opacity .2s, transform .2s;padding:2px;}
+  .profile-chip.active{opacity:1;transform:translateY(-2px);}
+  .profile-avatar{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:var(--shadow);border:3px solid #fff;}
+  .profile-chip.active .profile-avatar{box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--chip-color,#FF6FA5), var(--shadow);}
+  .profile-chip span{font-size:12px;font-weight:700;color:var(--ink-soft);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .profile-chip.active span{color:var(--ink);}
+  .profile-chip.add .profile-avatar{background:#fff;border:2px dashed #cfd3e6;color:#9aa0c0;font-size:22px;}
+
+  .stats-line{padding:0 20px 10px;font-size:13px;color:var(--ink-soft);font-weight:700;}
+
+  /* ---------- Wall ---------- */
+  .wall{flex:1;padding:8px 16px 120px;display:flex;flex-wrap:wrap;gap:14px;align-content:flex-start;justify-content:flex-start;}
+  .empty-state{margin:14vh auto;text-align:center;color:var(--ink-soft);padding:0 30px;}
+  .empty-state .big-emoji{font-size:64px;display:block;margin-bottom:10px;animation:float 3s ease-in-out infinite;}
+  .empty-state h2{color:var(--ink);margin:0 0 6px;font-size:20px;}
+  .empty-state p{margin:0;font-size:14px;line-height:1.5;}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+  .badge-card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:12px 10px 10px;display:flex;flex-direction:column;align-items:center;text-align:center;cursor:pointer;animation:popIn .35s cubic-bezier(.34,1.56,.64,1) backwards;transition:transform .15s ease;}
+  .badge-card:active{transform:scale(.95);}
+  .badge-card.size-small{width:104px;}
+  .badge-card.size-medium{width:132px;}
+  .badge-card.size-large{width:160px;}
+  .badge-card .badge-title{font-weight:800;font-size:12.5px;margin-top:8px;line-height:1.25;color:var(--ink);}
+  .badge-card .badge-date{font-size:10.5px;color:var(--ink-soft);margin-top:2px;font-weight:700;}
+  .badge-card .has-media{display:flex;gap:4px;margin-top:5px;font-size:11px;}
+  @keyframes popIn{0%{opacity:0;transform:scale(.4) rotate(-8deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+
+  .badge-shape-wrap{position:relative;flex:0 0 auto;}
+  .badge-shape-wrap svg{display:block;filter:drop-shadow(0 4px 8px rgba(46,53,82,.18));}
+  .badge-emoji-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+  .size-small .badge-shape-wrap svg,.picker-size[data-size=small] svg{width:60px;height:60px;}
+  .size-medium .badge-shape-wrap svg{width:80px;height:80px;}
+  .size-large .badge-shape-wrap svg{width:100px;height:100px;}
+
+  /* ---------- FAB ---------- */
+  .fab{position:fixed;right:20px;bottom:calc(24px + env(safe-area-inset-bottom));width:64px;height:64px;border-radius:50%;background:linear-gradient(145deg,var(--pink),#FF4E93);border:none;box-shadow:0 10px 26px rgba(255,111,165,.55);color:#fff;font-size:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:40;transition:transform .15s ease;}
+  .fab:active{transform:scale(.9) rotate(15deg);}
+  .app-fab-anchor{max-width:560px;margin:0 auto;position:relative;}
+
+  /* ---------- Modal ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(46,53,82,.45);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+  .overlay.open{opacity:1;pointer-events:auto;}
+  .sheet{background:var(--cream);width:100%;max-width:560px;max-height:92dvh;border-radius:26px 26px 0 0;padding:14px 18px calc(20px + env(safe-area-inset-bottom));overflow-y:auto;transform:translateY(30px);transition:transform .25s cubic-bezier(.34,1.2,.64,1);box-shadow:0 -10px 40px rgba(0,0,0,.25);}
+  .overlay.open .sheet{transform:translateY(0);}
+  .sheet-handle{width:40px;height:5px;background:#dfe1ee;border-radius:3px;margin:2px auto 12px;}
+  .sheet h2{margin:0 0 14px;font-size:20px;}
+  .sheet-close{position:absolute;top:14px;right:16px;}
+
+  .field-label{font-weight:800;font-size:13px;margin:16px 0 8px;color:var(--ink);}
+  .field-label:first-of-type{margin-top:4px;}
+  input[type=text],textarea{width:100%;border:2px solid #eceef8;background:#fff;border-radius:14px;padding:11px 13px;font-size:15px;font-family:inherit;color:var(--ink);resize:none;}
+  input[type=text]:focus,textarea:focus{outline:none;border-color:var(--pink);}
+  textarea{min-height:74px;}
+
+  .swatch-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .swatch{width:38px;height:38px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:transform .15s;}
+  .swatch.selected{border-color:var(--ink);transform:scale(1.12);}
+  .swatch:active{transform:scale(.9);}
+
+  .shape-row,.size-row{display:flex;gap:10px;}
+  .picker-shape,.picker-size{flex:1;border:2px solid #eceef8;background:#fff;border-radius:14px;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-size:11px;font-weight:800;color:var(--ink-soft);}
+  .picker-shape.selected,.picker-size.selected{border-color:var(--pink);background:#FFF0F6;color:var(--ink);}
+  .picker-shape svg{width:34px;height:34px;}
+  .picker-size .dot{border-radius:50%;background:var(--ink-soft);}
+  .picker-size[data-size=small] .dot{width:12px;height:12px;}
+  .picker-size[data-size=medium] .dot{width:18px;height:18px;}
+  .picker-size[data-size=large] .dot{width:24px;height:24px;}
+  .picker-size.selected .dot{background:var(--pink);}
+
+  .emoji-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+  .emoji-btn{aspect-ratio:1;border:2px solid #eceef8;background:#fff;border-radius:12px;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .emoji-btn.selected{border-color:var(--pink);background:#FFF0F6;}
+
+  .preview-row{display:flex;justify-content:center;margin:6px 0 4px;}
+
+  .media-row{display:flex;gap:10px;}
+  .media-btn{flex:1;border:2px dashed #cfd3e6;background:#fff;border-radius:14px;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:800;font-size:12.5px;color:var(--ink-soft);cursor:pointer;}
+  .media-btn.filled{border-style:solid;border-color:var(--grass);color:var(--ink);}
+  .media-btn .glyph{font-size:22px;}
+  .photo-preview{width:100%;border-radius:14px;margin-top:8px;display:block;max-height:220px;object-fit:cover;}
+  .remove-media{margin-top:6px;background:none;border:none;color:#E24C6B;font-weight:800;font-size:12.5px;cursor:pointer;}
+  audio{width:100%;margin-top:8px;}
+  .rec-indicator{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:8px;font-weight:800;color:#E24C6B;font-size:13px;}
+  .rec-dot{width:10px;height:10px;border-radius:50%;background:#E24C6B;animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @keyframes shakeX{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-8px)}40%,60%{transform:translateX(8px)}}
+
+  .primary-btn{width:100%;margin-top:20px;padding:15px;border:none;border-radius:16px;background:linear-gradient(145deg,var(--pink),#FF4E93);color:#fff;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 8px 20px rgba(255,111,165,.4);}
+  .primary-btn:active{transform:scale(.98);}
+  .primary-btn.secondary{background:linear-gradient(145deg,#EFF1FA,#E4E7F5);color:var(--ink);box-shadow:none;}
+  .primary-btn.danger{background:linear-gradient(145deg,#FF7A59,#E24C6B);}
+  .btn-row{display:flex;gap:10px;}
+  .btn-row .primary-btn{margin-top:14px;}
+
+  /* ---------- Detail sheet ---------- */
+  .detail-badge{display:flex;flex-direction:column;align-items:center;padding:6px 0 4px;}
+  .detail-title{font-size:21px;margin:14px 0 2px;text-align:center;}
+  .detail-date{text-align:center;color:var(--ink-soft);font-weight:700;font-size:12.5px;margin-bottom:14px;}
+  .detail-note{background:#fff;border-radius:16px;padding:14px 16px;font-size:15px;line-height:1.5;color:var(--ink);white-space:pre-wrap;}
+
+  /* ---------- Settings ---------- */
+  .settings-item{display:flex;align-items:center;gap:12px;background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:10px;cursor:pointer;}
+  .settings-item .glyph{font-size:22px;}
+  .settings-item .txt b{display:block;font-size:14.5px;}
+  .settings-item .txt span{display:block;font-size:12px;color:var(--ink-soft);margin-top:1px;}
+  .settings-item.danger .txt b{color:#E24C6B;}
+  input[type=file]{display:none;}
+
+  .profile-list-row{display:flex;align-items:center;gap:10px;background:#fff;border-radius:14px;padding:10px 12px;margin-bottom:8px;}
+  .profile-list-row .profile-avatar{width:38px;height:38px;font-size:18px;}
+  .profile-list-row b{flex:1;font-size:14px;}
+  .profile-list-row button{border:none;background:none;font-size:16px;cursor:pointer;padding:6px;}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:12px 20px;border-radius:14px;font-weight:700;font-size:13.5px;z-index:300;opacity:0;transition:all .25s ease;box-shadow:var(--shadow-lg);max-width:88vw;text-align:center;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  .confetti-piece{position:fixed;top:-10px;width:9px;height:14px;z-index:400;pointer-events:none;animation:fall linear forwards;border-radius:2px;}
+  @keyframes fall{to{transform:translateY(105vh) rotate(600deg);opacity:.9}}
+
+  ::selection{background:var(--pink);color:#fff;}
+  .hidden{display:none !important;}
+  .onboard-lock{position:fixed;inset:0;background:var(--cream);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="grad-sunshine" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFDD6B"/><stop offset="1" stop-color="#FFAE1F"/></linearGradient>
+    <linearGradient id="grad-bubblegum" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF9EC7"/><stop offset="1" stop-color="#FF4E93"/></linearGradient>
+    <linearGradient id="grad-sky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8FE0FF"/><stop offset="1" stop-color="#1FA1E6"/></linearGradient>
+    <linearGradient id="grad-grass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B3ED96"/><stop offset="1" stop-color="#4CAE44"/></linearGradient>
+    <linearGradient id="grad-grape" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D3AEFA"/><stop offset="1" stop-color="#8A45D4"/></linearGradient>
+    <linearGradient id="grad-coral" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB18F"/><stop offset="1" stop-color="#FF5A2E"/></linearGradient>
+    <linearGradient id="grad-mint" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9FF6DC"/><stop offset="1" stop-color="#17AE8F"/></linearGradient>
+    <linearGradient id="grad-berry" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8FAE"/><stop offset="1" stop-color="#C81E5C"/></linearGradient>
+  </defs>
+</svg>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><span class="brand-emoji">⭐</span><h1>Kudos Wall</h1></div>
+    <button class="icon-btn" id="btnSettings" aria-label="Settings">⚙️</button>
+  </div>
+
+  <div class="profiles-row" id="profilesRow"></div>
+  <div class="stats-line" id="statsLine"></div>
+
+  <div class="wall" id="wall"></div>
+
+  <div class="app-fab-anchor">
+    <button class="fab" id="btnAdd" aria-label="Add badge">＋</button>
+  </div>
+</div>
+
+<!-- Parent Gate Sheet -->
+<div class="overlay" id="overlayGate">
+  <div class="sheet" style="position:relative">
+    <div class="sheet-handle"></div>
+    <button class="icon-btn sheet-close" id="closeGate">✕</button>
+    <div style="text-align:center;padding:6px 0 4px;">
+      <div style="font-size:44px;">🔒</div>
+      <h2 style="margin:10px 0 4px;">Quick grown-up check</h2>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin:0 0 18px;">Answer this to add a new badge</p>
+      <div id="gateQuestion" class="display" style="font-size:34px;font-weight:700;margin-bottom:16px;"></div>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="gateAnswer" placeholder="?" style="text-align:center;font-size:22px;font-weight:800;max-width:140px;margin:0 auto 6px;display:block;">
+      <div id="gateError" style="color:#E24C6B;font-weight:800;font-size:13px;min-height:18px;margin-top:4px;"></div>
+    </div>
+    <button class="primary-btn" id="btnGateSubmit">Submit</button>
+  </div>
+</div>
+
+<!-- Add Badge Sheet -->
+<div class="overlay" id="overlayAdd">
+  <div class="sheet" style="position:relative">
+    <div class="sheet-handle"></div>
+    <button class="icon-btn sheet-close" id="closeAdd">✕</button>
+    <h2>Give a Badge 🎉</h2>
+
+    <div class="preview-row"><div id="livePreview"></div></div>
+
+    <div class="field-label">Shape</div>
+    <div class="shape-row" id="shapeRow"></div>
+
+    <div class="field-label">Color</div>
+    <div class="swatch-row" id="colorRow"></div>
+
+    <div class="field-label">Size</div>
+    <div class="size-row" id="sizeRow"></div>
+
+    <div class="field-label">Icon</div>
+    <div class="emoji-grid" id="emojiGrid"></div>
+
+    <div class="field-label">What did they do?</div>
+    <input type="text" id="badgeTitle" placeholder="e.g. Helped make dinner!" maxlength="60">
+
+    <div class="field-label">Note (optional)</div>
+    <textarea id="badgeNote" placeholder="Tell the story..." maxlength="600"></textarea>
+
+    <div class="field-label">Photo &amp; voice note (optional)</div>
+    <div class="media-row">
+      <div class="media-btn" id="btnPhoto"><span class="glyph">📷</span>Add photo</div>
+      <div class="media-btn" id="btnAudio"><span class="glyph">🎙️</span>Record voice</div>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" capture="environment">
+    <img id="photoPreview" class="photo-preview hidden">
+    <button class="remove-media hidden" id="removePhoto">Remove photo</button>
+    <div id="recIndicator" class="rec-indicator hidden"><span class="rec-dot"></span><span id="recTimer">Recording... 0:00</span></div>
+    <audio id="audioPreview" class="hidden" controls></audio>
+    <button class="remove-media hidden" id="removeAudio">Remove recording</button>
+
+    <button class="primary-btn" id="btnSaveBadge">Save Badge ✨</button>
+  </div>
+</div>
+
+<!-- Detail Sheet -->
+<div class="overlay" id="overlayDetail">
+  <div class="sheet" style="position:relative">
+    <div class="sheet-handle"></div>
+    <button class="icon-btn sheet-close" id="closeDetail">✕</button>
+    <div class="detail-badge" id="detailBadgeShape"></div>
+    <h2 class="detail-title" id="detailTitle"></h2>
+    <div class="detail-date" id="detailDate"></div>
+    <img id="detailPhoto" class="photo-preview hidden">
+    <audio id="detailAudio" class="hidden" controls></audio>
+    <div class="detail-note hidden" id="detailNoteWrap"><span id="detailNote"></span></div>
+    <button class="primary-btn danger" id="btnDeleteBadge">Delete this badge</button>
+  </div>
+</div>
+
+<!-- Settings Sheet -->
+<div class="overlay" id="overlaySettings">
+  <div class="sheet" style="position:relative">
+    <div class="sheet-handle"></div>
+    <button class="icon-btn sheet-close" id="closeSettings">✕</button>
+    <h2>Settings</h2>
+
+    <div class="field-label" style="margin-top:0">Kids</div>
+    <div id="profileManageList"></div>
+    <div class="settings-item" id="btnAddProfileSettings"><span class="glyph">➕</span><div class="txt"><b>Add a kid</b><span>Create a new profile</span></div></div>
+
+    <div class="field-label">Backup</div>
+    <div class="settings-item" id="btnExport"><span class="glyph">⬇️</span><div class="txt"><b>Export backup</b><span>Save everything to one file</span></div></div>
+    <div class="settings-item" id="btnImport"><span class="glyph">⬆️</span><div class="txt"><b>Restore backup</b><span>Load badges from a file</span></div></div>
+    <input type="file" id="importInput" accept="application/json,.json">
+
+    <div class="field-label">Danger zone</div>
+    <div class="settings-item danger" id="btnEraseAll"><span class="glyph">🗑️</span><div class="txt"><b>Erase all data</b><span>Delete every kid and badge</span></div></div>
+
+    <div class="field-label">About</div>
+    <p style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;padding:0 2px">Kudos Wall stores everything on this device only, inside your browser's local database. Nothing is uploaded anywhere. Export a backup regularly and keep it somewhere safe!</p>
+  </div>
+</div>
+
+<!-- Add/Edit Profile Sheet -->
+<div class="overlay" id="overlayProfile">
+  <div class="sheet" style="position:relative">
+    <div class="sheet-handle"></div>
+    <button class="icon-btn sheet-close" id="closeProfile">✕</button>
+    <h2 id="profileSheetTitle">Add a Kid</h2>
+
+    <div class="preview-row"><div class="profile-avatar" id="profileAvatarPreview" style="width:70px;height:70px;font-size:32px;"></div></div>
+
+    <div class="field-label" style="margin-top:0">Name</div>
+    <input type="text" id="profileName" placeholder="e.g. Maya" maxlength="24">
+
+    <div class="field-label">Avatar</div>
+    <div class="emoji-grid" id="profileEmojiGrid"></div>
+
+    <div class="field-label">Color</div>
+    <div class="swatch-row" id="profileColorRow"></div>
+
+    <button class="primary-btn" id="btnSaveProfile">Save</button>
+    <button class="primary-btn danger hidden" id="btnDeleteProfile">Delete this kid &amp; their badges</button>
+  </div>
+</div>
+
+<div class="onboard-lock hidden" id="onboardLock">
+  <div style="text-align:center;max-width:320px;">
+    <div style="font-size:60px;margin-bottom:6px;">🌟</div>
+    <h1 style="margin:0 0 8px;">Welcome to Kudos Wall!</h1>
+    <p style="color:var(--ink-soft);font-size:14.5px;line-height:1.5;margin:0 0 20px;">Let's set up a profile for your kiddo so you can start handing out badges for the awesome things they do.</p>
+    <button class="primary-btn" id="btnOnboardStart">Add my first kid 🎉</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============ CONFIG ============ */
+const SHAPES = {
+  circle:  { label:'Circle',  d:null },
+  star:    { label:'Star',    d:'M50 4 L61 36 L95 36 L67 57 L78 92 L50 71 L22 92 L33 57 L5 36 L39 36 Z' },
+  heart:   { label:'Heart',   d:'M50 92 C50 92 8 60 8 32 C8 14 24 6 38 6 C46 6 50 14 50 22 C50 14 54 6 62 6 C76 6 92 14 92 32 C92 60 50 92 50 92 Z' },
+  shield:  { label:'Shield',  d:'M50 4 L90 16 L90 46 C90 72 72 90 50 96 C28 90 10 72 10 46 L10 16 Z' },
+  hexagon: { label:'Hexagon', d:'M27 6 L73 6 L96 50 L73 94 L27 94 L4 50 Z' }
+};
+const SHAPE_ORDER = ['circle','star','heart','shield','hexagon'];
+const COLORS = ['sunshine','bubblegum','sky','grass','grape','coral','mint','berry'];
+const SIZES = ['small','medium','large'];
+const EMOJIS = ['⭐','🌟','💖','💗','💕','🏆','🥇','🎖️','👑','🌈','☀️','🎉','✨','💪','🚀','🦄','🐱','🐶','🍦','🎈','📚','🎨','🧠','🤝'];
+const PROFILE_EMOJIS = ['👧','👦','🧒','👶','😊','🐱','🐶','🦄','🌟','🐻','🦊','🐰'];
+
+/* ============ STATE ============ */
+let db = null;
+let profiles = [];
+let activeProfileId = null;
+let badges = [];
+let editingProfileId = null; // null = creating new
+let pendingPhoto = null;
+let pendingAudio = null;
+let mediaRecorder = null, recChunks = [], recStart = 0, recTimerInt = null, recStream = null;
+let selShape='star', selColor='sunshine', selSize='medium', selEmoji='⭐';
+
+/* ============ INDEXEDDB LAYER ============ */
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open('kudos-badges-db', 1);
+    req.onupgradeneeded = (e)=>{
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains('profiles')) d.createObjectStore('profiles',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('badges')){
+        const s = d.createObjectStore('badges',{keyPath:'id'});
+        s.createIndex('profileId','profileId',{unique:false});
+      }
+      if(!d.objectStoreNames.contains('meta')) d.createObjectStore('meta',{keyPath:'key'});
+    };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function tx(store, mode){ return db.transaction(store, mode).objectStore(store); }
+function reqP(r){ return new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+function dbGetAll(store){ return reqP(tx(store,'readonly').getAll()); }
+function dbGetAllByIndex(store, idx, val){ return reqP(tx(store,'readonly').index(idx).getAll(val)); }
+function dbPut(store, val){ return reqP(tx(store,'readwrite').put(val)); }
+function dbDelete(store, key){ return reqP(tx(store,'readwrite').delete(key)); }
+function dbClear(store){ return reqP(tx(store,'readwrite').clear()); }
+function dbGet(store, key){ return reqP(tx(store,'readonly').get(key)); }
+
+function uuid(){
+  if(crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+    const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8); return v.toString(16);
+  });
+}
+
+/* ============ MANIFEST ============ */
+(function setManifest(){
+  const icon = 'data:image/svg+xml,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#FF6FA5"/><text x="50" y="68" font-size="58" text-anchor="middle">⭐</text></svg>`);
+  const manifest = {
+    name:"Kudos Wall", short_name:"Kudos",
+    start_url:".", display:"standalone", background_color:"#FFFBF3", theme_color:"#FF6FA5",
+    icons:[{src:icon, sizes:"512x512", type:"image/svg+xml", purpose:"any maskable"}]
+  };
+  document.getElementById('manifest-link').href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+})();
+
+/* ============ UTIL ============ */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric', year:'numeric'}) +
+    ' · ' + d.toLocaleTimeString(undefined,{hour:'numeric', minute:'2-digit'});
+}
+function openSheet(id){ document.getElementById(id).classList.add('open'); }
+function closeSheet(id){ document.getElementById(id).classList.remove('open'); }
+
+function badgeShapeSVG(shape, color, sizePx){
+  const s = SHAPES[shape] || SHAPES.circle;
+  const inner = s.d
+    ? `<path d="${s.d}" fill="url(#grad-${color})" stroke="rgba(255,255,255,.65)" stroke-width="3"/>`
+    : `<circle cx="50" cy="50" r="46" fill="url(#grad-${color})" stroke="rgba(255,255,255,.65)" stroke-width="3"/>`;
+  return `<svg viewBox="0 0 100 100" width="${sizePx}" height="${sizePx}">${inner}</svg>`;
+}
+function renderBadgeVisual(shape,color,size,emoji, sizePxOverride){
+  const px = sizePxOverride || ({small:60,medium:80,large:100})[size] || 80;
+  const emojiPx = Math.round(px*0.42);
+  const wrap = document.createElement('div');
+  wrap.className = 'badge-shape-wrap';
+  wrap.innerHTML = badgeShapeSVG(shape,color,px) + `<div class="badge-emoji-overlay" style="font-size:${emojiPx}px">${emoji}</div>`;
+  return wrap;
+}
+function confettiBurst(){
+  const colorsHex = ['#FFC93C','#FF6FA5','#4FC3F7','#6BCB77','#9B72CF','#FF7A59'];
+  for(let i=0;i<26;i++){
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.left = Math.random()*100+'vw';
+    p.style.background = colorsHex[i%colorsHex.length];
+    p.style.animationDuration = (1.1+Math.random()*.9)+'s';
+    p.style.transform = `rotate(${Math.random()*360}deg)`;
+    document.body.appendChild(p);
+    setTimeout(()=>p.remove(), 2200);
+  }
+}
+
+/* ============ RENDER: PROFILES ============ */
+function colorHex(name){
+  return {sunshine:'#FFAE1F',bubblegum:'#FF4E93',sky:'#1FA1E6',grass:'#4CAE44',grape:'#8A45D4',coral:'#FF5A2E',mint:'#17AE8F',berry:'#C81E5C'}[name] || '#FF6FA5';
+}
+function renderProfiles(){
+  const row = document.getElementById('profilesRow');
+  row.innerHTML = '';
+  profiles.forEach(p=>{
+    const chip = document.createElement('div');
+    chip.className = 'profile-chip' + (p.id===activeProfileId ? ' active':'');
+    chip.style.setProperty('--chip-color', colorHex(p.color));
+    chip.innerHTML = `<div class="profile-avatar" style="background:linear-gradient(145deg,${colorHex(p.color)}55,${colorHex(p.color)}22)">${p.emoji}</div><span>${escapeHtml(p.name)}</span>`;
+    chip.addEventListener('click', ()=>selectProfile(p.id));
+    row.appendChild(chip);
+  });
+  const addChip = document.createElement('div');
+  addChip.className = 'profile-chip add';
+  addChip.innerHTML = `<div class="profile-avatar">＋</div><span>Add kid</span>`;
+  addChip.addEventListener('click', ()=>openProfileSheet(null));
+  row.appendChild(addChip);
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+async function selectProfile(id){
+  activeProfileId = id;
+  await dbPut('meta', {key:'lastProfileId', value:id});
+  renderProfiles();
+  await loadBadges();
+}
+
+/* ============ RENDER: WALL ============ */
+async function loadBadges(){
+  if(!activeProfileId){ badges = []; }
+  else badges = await dbGetAllByIndex('badges','profileId',activeProfileId);
+  badges.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+  renderWall();
+}
+function renderWall(){
+  const wall = document.getElementById('wall');
+  const statsLine = document.getElementById('statsLine');
+  wall.innerHTML = '';
+  if(!activeProfileId || badges.length===0){
+    statsLine.textContent = '';
+    const p = document.createElement('div');
+    p.className = 'empty-state';
+    p.innerHTML = `<span class="big-emoji">🎈</span><h2>No badges yet</h2><p>Tap the pink + button to give ${activeProfileId? (profiles.find(x=>x.id===activeProfileId)?.name||'them'):'your kiddo'} their first badge!</p>`;
+    wall.appendChild(p);
+    return;
+  }
+  const weekAgo = Date.now() - 7*24*60*60*1000;
+  const thisWeek = badges.filter(b=> new Date(b.createdAt).getTime() > weekAgo).length;
+  statsLine.textContent = `${badges.length} badge${badges.length===1?'':'s'} total · ${thisWeek} this week`;
+
+  badges.forEach((b,i)=>{
+    const card = document.createElement('div');
+    card.className = `badge-card size-${b.size}`;
+    card.style.animationDelay = (Math.min(i,10)*0.04)+'s';
+    const visual = renderBadgeVisual(b.shape,b.color,b.size,b.emoji);
+    card.appendChild(visual);
+    const title = document.createElement('div');
+    title.className = 'badge-title';
+    title.textContent = b.title;
+    card.appendChild(title);
+    const date = document.createElement('div');
+    date.className = 'badge-date';
+    date.textContent = new Date(b.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+    card.appendChild(date);
+    if(b.photo || b.audio){
+      const media = document.createElement('div');
+      media.className = 'has-media';
+      media.innerHTML = (b.photo?'📷':'') + (b.audio?'🎙️':'');
+      card.appendChild(media);
+    }
+    card.addEventListener('click', ()=>openDetail(b));
+    wall.appendChild(card);
+  });
+}
+
+/* ============ ADD BADGE SHEET ============ */
+function buildPickers(){
+  const shapeRow = document.getElementById('shapeRow');
+  shapeRow.innerHTML = '';
+  SHAPE_ORDER.forEach(sh=>{
+    const el = document.createElement('div');
+    el.className = 'picker-shape' + (sh===selShape?' selected':'');
+    el.innerHTML = badgeShapeSVG(sh,'sunshine',34) + `<span>${SHAPES[sh].label}</span>`;
+    el.addEventListener('click', ()=>{ selShape = sh; buildPickers(); updateLivePreview(); });
+    shapeRow.appendChild(el);
+  });
+  const colorRow = document.getElementById('colorRow');
+  colorRow.innerHTML = '';
+  COLORS.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'swatch' + (c===selColor?' selected':'');
+    el.style.background = `linear-gradient(145deg, ${colorHex(c)}cc, ${colorHex(c)})`;
+    el.addEventListener('click', ()=>{ selColor = c; buildPickers(); updateLivePreview(); });
+    colorRow.appendChild(el);
+  });
+  const sizeRow = document.getElementById('sizeRow');
+  sizeRow.innerHTML = '';
+  SIZES.forEach(sz=>{
+    const el = document.createElement('div');
+    el.className = 'picker-size' + (sz===selSize?' selected':'');
+    el.dataset.size = sz;
+    el.innerHTML = `<div class="dot"></div><span>${sz[0].toUpperCase()+sz.slice(1)}</span>`;
+    el.addEventListener('click', ()=>{ selSize = sz; buildPickers(); updateLivePreview(); });
+    sizeRow.appendChild(el);
+  });
+  const eg = document.getElementById('emojiGrid');
+  eg.innerHTML = '';
+  EMOJIS.forEach(em=>{
+    const el = document.createElement('div');
+    el.className = 'emoji-btn' + (em===selEmoji?' selected':'');
+    el.textContent = em;
+    el.addEventListener('click', ()=>{ selEmoji = em; buildPickers(); updateLivePreview(); });
+    eg.appendChild(el);
+  });
+}
+function updateLivePreview(){
+  const holder = document.getElementById('livePreview');
+  holder.innerHTML = '';
+  holder.appendChild(renderBadgeVisual(selShape, selColor, selSize, selEmoji, 110));
+}
+function resetAddForm(){
+  selShape='star'; selColor='sunshine'; selSize='medium'; selEmoji='⭐';
+  document.getElementById('badgeTitle').value = '';
+  document.getElementById('badgeNote').value = '';
+  pendingPhoto = null; pendingAudio = null;
+  document.getElementById('photoPreview').classList.add('hidden');
+  document.getElementById('removePhoto').classList.add('hidden');
+  document.getElementById('btnPhoto').classList.remove('filled');
+  document.getElementById('audioPreview').classList.add('hidden');
+  document.getElementById('audioPreview').removeAttribute('src');
+  document.getElementById('removeAudio').classList.add('hidden');
+  document.getElementById('btnAudio').classList.remove('filled');
+  document.getElementById('recIndicator').classList.add('hidden');
+  buildPickers(); updateLivePreview();
+}
+
+document.getElementById('btnAdd').addEventListener('click', ()=>{
+  if(!activeProfileId){ toast('Add a kid profile first!'); openProfileSheet(null); return; }
+  openGate();
+});
+document.getElementById('closeAdd').addEventListener('click', ()=>closeSheet('overlayAdd'));
+
+/* ============ PARENT GATE (multiplication check before adding a badge) ============ */
+let gateAnswer = 0;
+function openGate(){
+  const a = 2 + Math.floor(Math.random()*8); // 2-9
+  const b = 2 + Math.floor(Math.random()*8); // 2-9
+  gateAnswer = a*b;
+  document.getElementById('gateQuestion').textContent = `${a} × ${b} = ?`;
+  document.getElementById('gateAnswer').value = '';
+  document.getElementById('gateError').textContent = '';
+  openSheet('overlayGate');
+  setTimeout(()=>document.getElementById('gateAnswer').focus(), 250);
+}
+function checkGate(){
+  const val = document.getElementById('gateAnswer').value.trim();
+  if(val === '' ) { document.getElementById('gateError').textContent = 'Type an answer first'; return; }
+  if(parseInt(val,10) === gateAnswer){
+    closeSheet('overlayGate');
+    resetAddForm();
+    openSheet('overlayAdd');
+  } else {
+    document.getElementById('gateError').textContent = 'Not quite — try again!';
+    const q = document.getElementById('gateQuestion');
+    q.style.animation = 'none'; void q.offsetWidth; q.style.animation = 'shakeX .4s';
+    const a = 2 + Math.floor(Math.random()*8), b = 2 + Math.floor(Math.random()*8);
+    gateAnswer = a*b;
+    document.getElementById('gateQuestion').textContent = `${a} × ${b} = ?`;
+    document.getElementById('gateAnswer').value = '';
+    document.getElementById('gateAnswer').focus();
+  }
+}
+document.getElementById('closeGate').addEventListener('click', ()=>closeSheet('overlayGate'));
+document.getElementById('btnGateSubmit').addEventListener('click', checkGate);
+document.getElementById('gateAnswer').addEventListener('keydown', (e)=>{ if(e.key==='Enter') checkGate(); });
+
+/* -- photo capture -- */
+document.getElementById('btnPhoto').addEventListener('click', ()=> document.getElementById('photoInput').click());
+document.getElementById('photoInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const maxDim = 900;
+      let w = img.width, h = img.height;
+      if(w > h && w > maxDim){ h = Math.round(h*maxDim/w); w = maxDim; }
+      else if(h > maxDim){ w = Math.round(w*maxDim/h); h = maxDim; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      pendingPhoto = canvas.toDataURL('image/jpeg', 0.75);
+      const prev = document.getElementById('photoPreview');
+      prev.src = pendingPhoto; prev.classList.remove('hidden');
+      document.getElementById('removePhoto').classList.remove('hidden');
+      document.getElementById('btnPhoto').classList.add('filled');
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
+document.getElementById('removePhoto').addEventListener('click', ()=>{
+  pendingPhoto = null;
+  document.getElementById('photoPreview').classList.add('hidden');
+  document.getElementById('removePhoto').classList.add('hidden');
+  document.getElementById('btnPhoto').classList.remove('filled');
+});
+
+/* -- audio recording -- */
+document.getElementById('btnAudio').addEventListener('click', async ()=>{
+  if(mediaRecorder && mediaRecorder.state === 'recording'){ stopRecording(); return; }
+  try{
+    recStream = await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(err){
+    toast('Microphone access is needed to record. Check your permissions.');
+    return;
+  }
+  recChunks = [];
+  mediaRecorder = new MediaRecorder(recStream);
+  mediaRecorder.ondataavailable = e=>{ if(e.data.size>0) recChunks.push(e.data); };
+  mediaRecorder.onstop = ()=>{
+    const blob = new Blob(recChunks, {type: mediaRecorder.mimeType || 'audio/webm'});
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      pendingAudio = reader.result;
+      const prev = document.getElementById('audioPreview');
+      prev.src = pendingAudio; prev.classList.remove('hidden');
+      document.getElementById('removeAudio').classList.remove('hidden');
+      document.getElementById('btnAudio').classList.add('filled');
+    };
+    reader.readAsDataURL(blob);
+    if(recStream) recStream.getTracks().forEach(t=>t.stop());
+  };
+  mediaRecorder.start();
+  recStart = Date.now();
+  document.getElementById('recIndicator').classList.remove('hidden');
+  document.getElementById('audioPreview').classList.add('hidden');
+  document.getElementById('btnAudio').classList.remove('filled');
+  recTimerInt = setInterval(()=>{
+    const secs = Math.floor((Date.now()-recStart)/1000);
+    document.getElementById('recTimer').textContent = `Recording... ${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
+    if(secs >= 60) stopRecording();
+  }, 250);
+});
+function stopRecording(){
+  if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
+  clearInterval(recTimerInt);
+  document.getElementById('recIndicator').classList.add('hidden');
+}
+document.getElementById('removeAudio').addEventListener('click', ()=>{
+  pendingAudio = null;
+  const prev = document.getElementById('audioPreview');
+  prev.classList.add('hidden'); prev.removeAttribute('src');
+  document.getElementById('removeAudio').classList.add('hidden');
+  document.getElementById('btnAudio').classList.remove('filled');
+});
+
+document.getElementById('btnSaveBadge').addEventListener('click', async ()=>{
+  const title = document.getElementById('badgeTitle').value.trim();
+  if(!title){ toast('Give the badge a title first!'); return; }
+  const badge = {
+    id: uuid(),
+    profileId: activeProfileId,
+    shape: selShape, color: selColor, size: selSize, emoji: selEmoji,
+    title, note: document.getElementById('badgeNote').value.trim(),
+    photo: pendingPhoto, audio: pendingAudio,
+    createdAt: new Date().toISOString()
+  };
+  await dbPut('badges', badge);
+  closeSheet('overlayAdd');
+  confettiBurst();
+  toast('Badge awarded! 🎉');
+  await loadBadges();
+});
+
+/* ============ DETAIL SHEET ============ */
+let detailBadgeId = null;
+function openDetail(b){
+  detailBadgeId = b.id;
+  document.getElementById('detailBadgeShape').innerHTML = '';
+  document.getElementById('detailBadgeShape').appendChild(renderBadgeVisual(b.shape,b.color,b.size,b.emoji,130));
+  document.getElementById('detailTitle').textContent = b.title;
+  document.getElementById('detailDate').textContent = fmtDate(b.createdAt);
+  const photo = document.getElementById('detailPhoto');
+  if(b.photo){ photo.src = b.photo; photo.classList.remove('hidden'); } else photo.classList.add('hidden');
+  const audio = document.getElementById('detailAudio');
+  if(b.audio){ audio.src = b.audio; audio.classList.remove('hidden'); } else { audio.classList.add('hidden'); audio.removeAttribute('src'); }
+  const noteWrap = document.getElementById('detailNoteWrap');
+  if(b.note){ document.getElementById('detailNote').textContent = b.note; noteWrap.classList.remove('hidden'); } else noteWrap.classList.add('hidden');
+  openSheet('overlayDetail');
+}
+document.getElementById('closeDetail').addEventListener('click', ()=>closeSheet('overlayDetail'));
+document.getElementById('btnDeleteBadge').addEventListener('click', async ()=>{
+  if(!confirm('Delete this badge? This cannot be undone.')) return;
+  await dbDelete('badges', detailBadgeId);
+  closeSheet('overlayDetail');
+  toast('Badge deleted');
+  await loadBadges();
+});
+
+/* ============ SETTINGS SHEET ============ */
+document.getElementById('btnSettings').addEventListener('click', ()=>{ renderProfileManageList(); openSheet('overlaySettings'); });
+document.getElementById('closeSettings').addEventListener('click', ()=>closeSheet('overlaySettings'));
+document.getElementById('btnAddProfileSettings').addEventListener('click', ()=>{ closeSheet('overlaySettings'); openProfileSheet(null); });
+
+function renderProfileManageList(){
+  const list = document.getElementById('profileManageList');
+  list.innerHTML = '';
+  profiles.forEach(p=>{
+    const row = document.createElement('div');
+    row.className = 'profile-list-row';
+    row.innerHTML = `<div class="profile-avatar" style="background:linear-gradient(145deg,${colorHex(p.color)}55,${colorHex(p.color)}22)">${p.emoji}</div><b>${escapeHtml(p.name)}</b><button aria-label="Edit">✏️</button>`;
+    row.querySelector('button').addEventListener('click', ()=>{ closeSheet('overlaySettings'); openProfileSheet(p.id); });
+    list.appendChild(row);
+  });
+}
+
+/* -- export -- */
+document.getElementById('btnExport').addEventListener('click', async ()=>{
+  const allBadges = await dbGetAll('badges');
+  const payload = {
+    appId: 'kudos-badges-backup', version: 1, exportedAt: new Date().toISOString(),
+    profiles, badges: allBadges
+  };
+  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `kudos-badges-backup-${dateStr}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  toast('Backup file downloaded');
+});
+
+/* -- import -- */
+document.getElementById('btnImport').addEventListener('click', ()=> document.getElementById('importInput').click());
+document.getElementById('importInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  let data;
+  try{
+    data = JSON.parse(await file.text());
+    if(!data || data.appId !== 'kudos-badges-backup' || !Array.isArray(data.profiles) || !Array.isArray(data.badges)) throw new Error('bad format');
+  }catch(err){
+    toast("That file doesn't look like a valid Kudos backup.");
+    return;
+  }
+  const mode = confirm(
+    `This backup has ${data.profiles.length} kid(s) and ${data.badges.length} badge(s).\\n\\nPress OK to REPLACE all current data with this backup.\\nPress Cancel to ADD it alongside what you already have.`
+  );
+  closeSheet('overlaySettings');
+  if(mode){
+    await dbClear('profiles'); await dbClear('badges');
+    for(const p of data.profiles) await dbPut('profiles', p);
+    for(const b of data.badges) await dbPut('badges', b);
+    toast('Backup restored (replaced all data)');
+  } else {
+    const idMap = {};
+    for(const p of data.profiles){
+      const newId = uuid();
+      idMap[p.id] = newId;
+      await dbPut('profiles', {...p, id:newId});
+    }
+    for(const b of data.badges){
+      await dbPut('badges', {...b, id: uuid(), profileId: idMap[b.profileId] || b.profileId});
+    }
+    toast('Backup merged in as new kid(s)');
+  }
+  await refreshProfilesFromDB();
+});
+
+document.getElementById('btnEraseAll').addEventListener('click', async ()=>{
+  if(!confirm('This will permanently delete every kid and badge on this device. Are you absolutely sure?')) return;
+  if(!confirm('Really erase everything? This cannot be undone.')) return;
+  await dbClear('profiles'); await dbClear('badges'); await dbClear('meta');
+  closeSheet('overlaySettings');
+  await refreshProfilesFromDB();
+  toast('All data erased');
+});
+
+/* ============ PROFILE SHEET (create/edit) ============ */
+let profSelEmoji = '👧', profSelColor = 'bubblegum';
+function buildProfilePickers(){
+  const eg = document.getElementById('profileEmojiGrid');
+  eg.innerHTML = '';
+  PROFILE_EMOJIS.forEach(em=>{
+    const el = document.createElement('div');
+    el.className = 'emoji-btn' + (em===profSelEmoji?' selected':'');
+    el.textContent = em;
+    el.addEventListener('click', ()=>{ profSelEmoji = em; buildProfilePickers(); updateProfilePreview(); });
+    eg.appendChild(el);
+  });
+  const cr = document.getElementById('profileColorRow');
+  cr.innerHTML = '';
+  COLORS.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'swatch' + (c===profSelColor?' selected':'');
+    el.style.background = `linear-gradient(145deg, ${colorHex(c)}cc, ${colorHex(c)})`;
+    el.addEventListener('click', ()=>{ profSelColor = c; buildProfilePickers(); updateProfilePreview(); });
+    cr.appendChild(el);
+  });
+}
+function updateProfilePreview(){
+  const el = document.getElementById('profileAvatarPreview');
+  el.textContent = profSelEmoji;
+  el.style.background = `linear-gradient(145deg,${colorHex(profSelColor)}55,${colorHex(profSelColor)}22)`;
+}
+function openProfileSheet(profileId){
+  editingProfileId = profileId;
+  const del = document.getElementById('btnDeleteProfile');
+  if(profileId){
+    const p = profiles.find(x=>x.id===profileId);
+    document.getElementById('profileSheetTitle').textContent = 'Edit Kid';
+    document.getElementById('profileName').value = p.name;
+    profSelEmoji = p.emoji; profSelColor = p.color;
+    del.classList.remove('hidden');
+  } else {
+    document.getElementById('profileSheetTitle').textContent = 'Add a Kid';
+    document.getElementById('profileName').value = '';
+    profSelEmoji = PROFILE_EMOJIS[Math.floor(Math.random()*PROFILE_EMOJIS.length)];
+    profSelColor = COLORS[Math.floor(Math.random()*COLORS.length)];
+    del.classList.add('hidden');
+  }
+  buildProfilePickers(); updateProfilePreview();
+  openSheet('overlayProfile');
+}
+document.getElementById('closeProfile').addEventListener('click', ()=>closeSheet('overlayProfile'));
+document.getElementById('btnSaveProfile').addEventListener('click', async ()=>{
+  const name = document.getElementById('profileName').value.trim();
+  if(!name){ toast('Give this profile a name!'); return; }
+  const id = editingProfileId || uuid();
+  const existing = editingProfileId ? profiles.find(x=>x.id===editingProfileId) : null;
+  const rec = { id, name, emoji: profSelEmoji, color: profSelColor, createdAt: existing? existing.createdAt : new Date().toISOString() };
+  await dbPut('profiles', rec);
+  closeSheet('overlayProfile');
+  document.getElementById('onboardLock').classList.add('hidden');
+  await refreshProfilesFromDB();
+  if(!editingProfileId || activeProfileId===id){ await selectProfile(id); }
+  toast(existing ? 'Profile updated' : `${name} added! 🎉`);
+});
+document.getElementById('btnDeleteProfile').addEventListener('click', async ()=>{
+  const p = profiles.find(x=>x.id===editingProfileId);
+  const kidBadges = await dbGetAllByIndex('badges','profileId',editingProfileId);
+  if(!confirm(`Delete ${p.name} and all ${kidBadges.length} of their badges? This cannot be undone.`)) return;
+  for(const b of kidBadges) await dbDelete('badges', b.id);
+  await dbDelete('profiles', editingProfileId);
+  closeSheet('overlayProfile');
+  await refreshProfilesFromDB();
+  toast(`${p.name} was removed`);
+});
+document.getElementById('btnOnboardStart').addEventListener('click', ()=> openProfileSheet(null));
+
+/* ============ BOOTSTRAP ============ */
+async function refreshProfilesFromDB(){
+  profiles = await dbGetAll('profiles');
+  profiles.sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
+  if(profiles.length === 0){
+    activeProfileId = null;
+    renderProfiles();
+    document.getElementById('wall').innerHTML = '';
+    document.getElementById('statsLine').textContent = '';
+    document.getElementById('onboardLock').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('onboardLock').classList.add('hidden');
+  const meta = await dbGet('meta','lastProfileId').catch(()=>null);
+  if(meta && profiles.some(p=>p.id===meta.value)) activeProfileId = meta.value;
+  else if(!activeProfileId || !profiles.some(p=>p.id===activeProfileId)) activeProfileId = profiles[0].id;
+  renderProfiles();
+  await loadBadges();
+}
+
+// close overlays on backdrop click
+document.querySelectorAll('.overlay').forEach(ov=>{
+  ov.addEventListener('click', (e)=>{ if(e.target === ov) ov.classList.remove('open'); });
+});
+
+// install prompt (best-effort)
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredInstallPrompt = e; });
+
+(async function init(){
+  try{
+    db = await openDB();
+    buildPickers(); updateLivePreview();
+    await refreshProfilesFromDB();
+  }catch(err){
+    toast('Could not open local storage. Try a different browser.');
+    console.error(err);
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
