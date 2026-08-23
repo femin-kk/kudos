@@ -305,6 +305,7 @@
     <div class="settings-item" id="btnAddProfileSettings"><span class="glyph">➕</span><div class="txt"><b>Add a kid</b><span>Create a new profile</span></div></div>
 
     <div class="field-label">Backup</div>
+    <p id="storageEstimate" style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;font-weight:700;"></p>
     <div class="settings-item" id="btnExport"><span class="glyph">⬇️</span><div class="txt"><b>Export backup</b><span>Save everything to one file</span></div></div>
     <div class="settings-item" id="btnImport"><span class="glyph">⬆️</span><div class="txt"><b>Restore backup</b><span>Load badges from a file</span></div></div>
     <input type="file" id="importInput" accept="application/json,.json">
@@ -382,6 +383,7 @@ let badges = [];
 let editingProfileId = null; // null = creating new
 let pendingPhoto = null;
 let pendingAudio = null;
+let pendingPhotoURL = null, pendingAudioURL = null;
 let mediaRecorder = null, recChunks = [], recStart = 0, recTimerInt = null, recStream = null;
 let selShape='star', selColor='sunshine', selSize='medium', selEmoji='⭐';
 
@@ -600,7 +602,9 @@ function resetAddForm(){
   selShape='star'; selColor='sunshine'; selSize='medium'; selEmoji='⭐';
   document.getElementById('badgeTitle').value = '';
   document.getElementById('badgeNote').value = '';
-  pendingPhoto = null; pendingAudio = null;
+  if(pendingPhotoURL) URL.revokeObjectURL(pendingPhotoURL);
+  if(pendingAudioURL) URL.revokeObjectURL(pendingAudioURL);
+  pendingPhoto = null; pendingAudio = null; pendingPhotoURL = null; pendingAudioURL = null;
   document.getElementById('photoPreview').classList.add('hidden');
   document.getElementById('removePhoto').classList.add('hidden');
   document.getElementById('btnPhoto').classList.remove('filled');
@@ -670,11 +674,17 @@ document.getElementById('photoInput').addEventListener('change', (e)=>{
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img,0,0,w,h);
-      pendingPhoto = canvas.toDataURL('image/jpeg', 0.75);
-      const prev = document.getElementById('photoPreview');
-      prev.src = pendingPhoto; prev.classList.remove('hidden');
-      document.getElementById('removePhoto').classList.remove('hidden');
-      document.getElementById('btnPhoto').classList.add('filled');
+      // toBlob keeps this as raw binary (no base64 string), so it's ~25% smaller
+      // in IndexedDB and much cheaper to work with than a data URL as your library grows.
+      canvas.toBlob((blob)=>{
+        if(pendingPhotoURL) URL.revokeObjectURL(pendingPhotoURL);
+        pendingPhoto = blob;
+        pendingPhotoURL = URL.createObjectURL(blob);
+        const prev = document.getElementById('photoPreview');
+        prev.src = pendingPhotoURL; prev.classList.remove('hidden');
+        document.getElementById('removePhoto').classList.remove('hidden');
+        document.getElementById('btnPhoto').classList.add('filled');
+      }, 'image/jpeg', 0.75);
     };
     img.src = reader.result;
   };
@@ -682,7 +692,8 @@ document.getElementById('photoInput').addEventListener('change', (e)=>{
   e.target.value = '';
 });
 document.getElementById('removePhoto').addEventListener('click', ()=>{
-  pendingPhoto = null;
+  if(pendingPhotoURL) URL.revokeObjectURL(pendingPhotoURL);
+  pendingPhoto = null; pendingPhotoURL = null;
   document.getElementById('photoPreview').classList.add('hidden');
   document.getElementById('removePhoto').classList.add('hidden');
   document.getElementById('btnPhoto').classList.remove('filled');
@@ -698,19 +709,20 @@ document.getElementById('btnAudio').addEventListener('click', async ()=>{
     return;
   }
   recChunks = [];
-  mediaRecorder = new MediaRecorder(recStream);
+  // Lower bitrate: plenty clear for a spoken voice note, keeps recordings small at scale.
+  try{ mediaRecorder = new MediaRecorder(recStream, {audioBitsPerSecond: 32000}); }
+  catch(e){ mediaRecorder = new MediaRecorder(recStream); }
   mediaRecorder.ondataavailable = e=>{ if(e.data.size>0) recChunks.push(e.data); };
   mediaRecorder.onstop = ()=>{
+    // Keep the recording as a Blob directly — no base64 round-trip needed for storage.
     const blob = new Blob(recChunks, {type: mediaRecorder.mimeType || 'audio/webm'});
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      pendingAudio = reader.result;
-      const prev = document.getElementById('audioPreview');
-      prev.src = pendingAudio; prev.classList.remove('hidden');
-      document.getElementById('removeAudio').classList.remove('hidden');
-      document.getElementById('btnAudio').classList.add('filled');
-    };
-    reader.readAsDataURL(blob);
+    if(pendingAudioURL) URL.revokeObjectURL(pendingAudioURL);
+    pendingAudio = blob;
+    pendingAudioURL = URL.createObjectURL(blob);
+    const prev = document.getElementById('audioPreview');
+    prev.src = pendingAudioURL; prev.classList.remove('hidden');
+    document.getElementById('removeAudio').classList.remove('hidden');
+    document.getElementById('btnAudio').classList.add('filled');
     if(recStream) recStream.getTracks().forEach(t=>t.stop());
   };
   mediaRecorder.start();
@@ -730,7 +742,8 @@ function stopRecording(){
   document.getElementById('recIndicator').classList.add('hidden');
 }
 document.getElementById('removeAudio').addEventListener('click', ()=>{
-  pendingAudio = null;
+  if(pendingAudioURL) URL.revokeObjectURL(pendingAudioURL);
+  pendingAudio = null; pendingAudioURL = null;
   const prev = document.getElementById('audioPreview');
   prev.classList.add('hidden'); prev.removeAttribute('src');
   document.getElementById('removeAudio').classList.add('hidden');
@@ -745,10 +758,14 @@ document.getElementById('btnSaveBadge').addEventListener('click', async ()=>{
     profileId: activeProfileId,
     shape: selShape, color: selColor, size: selSize, emoji: selEmoji,
     title, note: document.getElementById('badgeNote').value.trim(),
-    photo: pendingPhoto, audio: pendingAudio,
+    photo: pendingPhoto, audio: pendingAudio, // stored as native Blobs, not base64
     createdAt: new Date().toISOString()
   };
   await dbPut('badges', badge);
+  // release the preview object URLs now that the Blobs are safely in IndexedDB
+  if(pendingPhotoURL) URL.revokeObjectURL(pendingPhotoURL);
+  if(pendingAudioURL) URL.revokeObjectURL(pendingAudioURL);
+  pendingPhotoURL = null; pendingAudioURL = null;
   closeSheet('overlayAdd');
   confettiBurst();
   toast('Badge awarded! 🎉');
@@ -757,16 +774,38 @@ document.getElementById('btnSaveBadge').addEventListener('click', async ()=>{
 
 /* ============ DETAIL SHEET ============ */
 let detailBadgeId = null;
+let detailPhotoURL = null, detailAudioURL = null;
+let detailPhotoIsObjectURL = false, detailAudioIsObjectURL = false;
+// Accepts either a Blob (current format) or a legacy base64 data-URL string
+// from badges created before the storage upgrade — both render fine.
+function mediaToSrc(x){
+  if(!x) return {src:null, isObjectURL:false};
+  if(x instanceof Blob) return {src: URL.createObjectURL(x), isObjectURL:true};
+  if(typeof x === 'string') return {src: x, isObjectURL:false};
+  return {src:null, isObjectURL:false};
+}
 function openDetail(b){
   detailBadgeId = b.id;
+  if(detailPhotoIsObjectURL && detailPhotoURL) URL.revokeObjectURL(detailPhotoURL);
+  if(detailAudioIsObjectURL && detailAudioURL) URL.revokeObjectURL(detailAudioURL);
+  detailPhotoURL = null; detailAudioURL = null;
   document.getElementById('detailBadgeShape').innerHTML = '';
   document.getElementById('detailBadgeShape').appendChild(renderBadgeVisual(b.shape,b.color,b.size,b.emoji,130));
   document.getElementById('detailTitle').textContent = b.title;
   document.getElementById('detailDate').textContent = fmtDate(b.createdAt);
   const photo = document.getElementById('detailPhoto');
-  if(b.photo){ photo.src = b.photo; photo.classList.remove('hidden'); photo.onclick = ()=>openLightbox(b.photo); } else photo.classList.add('hidden');
+  const photoInfo = mediaToSrc(b.photo);
+  if(photoInfo.src){
+    detailPhotoURL = photoInfo.src; detailPhotoIsObjectURL = photoInfo.isObjectURL;
+    photo.src = detailPhotoURL; photo.classList.remove('hidden');
+    photo.onclick = ()=>openLightbox(detailPhotoURL);
+  } else photo.classList.add('hidden');
   const audio = document.getElementById('detailAudio');
-  if(b.audio){ audio.src = b.audio; audio.classList.remove('hidden'); } else { audio.classList.add('hidden'); audio.removeAttribute('src'); }
+  const audioInfo = mediaToSrc(b.audio);
+  if(audioInfo.src){
+    detailAudioURL = audioInfo.src; detailAudioIsObjectURL = audioInfo.isObjectURL;
+    audio.src = detailAudioURL; audio.classList.remove('hidden');
+  } else { audio.classList.add('hidden'); audio.removeAttribute('src'); }
   const noteWrap = document.getElementById('detailNoteWrap');
   if(b.note){ document.getElementById('detailNote').textContent = b.note; noteWrap.classList.remove('hidden'); } else noteWrap.classList.add('hidden');
   openSheet('overlayDetail');
@@ -791,9 +830,24 @@ document.getElementById('btnDeleteBadge').addEventListener('click', ()=>{
 });
 
 /* ============ SETTINGS SHEET ============ */
-document.getElementById('btnSettings').addEventListener('click', ()=>{ renderProfileManageList(); openSheet('overlaySettings'); });
+document.getElementById('btnSettings').addEventListener('click', ()=>{ renderProfileManageList(); updateStorageEstimate(); openSheet('overlaySettings'); });
 document.getElementById('closeSettings').addEventListener('click', ()=>closeSheet('overlaySettings'));
 document.getElementById('btnAddProfileSettings').addEventListener('click', ()=>{ closeSheet('overlaySettings'); openProfileSheet(null); });
+
+async function updateStorageEstimate(){
+  const el = document.getElementById('storageEstimate');
+  if(!el) return;
+  if(navigator.storage && navigator.storage.estimate){
+    try{
+      const est = await navigator.storage.estimate();
+      const usedMB = ((est.usage||0)/1024/1024).toFixed(1);
+      const quotaGB = est.quota ? ((est.quota)/1024/1024/1024).toFixed(1)+' GB' : 'unknown';
+      el.textContent = `Using about ${usedMB} MB on this device (roughly ${quotaGB} available)`;
+    }catch(e){ el.textContent = ''; }
+  } else {
+    el.textContent = '';
+  }
+}
 
 function renderProfileManageList(){
   const list = document.getElementById('profileManageList');
@@ -808,20 +862,54 @@ function renderProfileManageList(){
 }
 
 /* -- export -- */
+function blobToBase64(blob){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onload = ()=>resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+function base64ToBlob(dataUrl){
+  // Uses the browser's native decoder (fast) instead of a manual atob loop.
+  return fetch(dataUrl).then(r=>r.blob());
+}
+
 document.getElementById('btnExport').addEventListener('click', async ()=>{
-  const allBadges = await dbGetAll('badges');
-  const payload = {
-    appId: 'kudos-badges-backup', version: 1, exportedAt: new Date().toISOString(),
-    profiles, badges: allBadges
-  };
-  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const dateStr = new Date().toISOString().slice(0,10);
-  a.href = url; a.download = `kudos-badges-backup-${dateStr}.json`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 4000);
-  toast('Backup file downloaded');
+  const btn = document.getElementById('btnExport');
+  if(btn.dataset.busy) return;
+  btn.dataset.busy = '1';
+  try{
+    const allBadges = await dbGetAll('badges');
+    // Build the file as an array of parts instead of one giant JSON.stringify() call.
+    // Each badge is serialized on its own and we yield back to the UI thread every
+    // few records, so this stays smooth even with hundreds of photos/voice notes.
+    const parts = [];
+    parts.push('{"appId":"kudos-badges-backup","version":1,"exportedAt":'
+      + JSON.stringify(new Date().toISOString()) + ',"profiles":' + JSON.stringify(profiles) + ',"badges":[');
+    for(let i=0;i<allBadges.length;i++){
+      const b = allBadges[i];
+      const out = {...b};
+      if(b.photo instanceof Blob) out.photo = await blobToBase64(b.photo);
+      if(b.audio instanceof Blob) out.audio = await blobToBase64(b.audio);
+      parts.push((i>0?',':'') + JSON.stringify(out));
+      if(i>0 && i%8===0){
+        toast(`Preparing backup… ${i+1}/${allBadges.length}`);
+        await new Promise(r=>setTimeout(r)); // yield to keep the UI responsive
+      }
+    }
+    parts.push(']}');
+    const blob = new Blob(parts, {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0,10);
+    a.href = url; a.download = `kudos-badges-backup-${dateStr}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+    toast(`Backup ready — ${(blob.size/1024/1024).toFixed(1)} MB downloaded`);
+  } finally {
+    delete btn.dataset.busy;
+  }
 });
 
 /* -- import -- */
@@ -839,26 +927,35 @@ document.getElementById('importInput').addEventListener('change', async (e)=>{
     return;
   }
   const mode = confirm(
-    `This backup has ${data.profiles.length} kid(s) and ${data.badges.length} badge(s).\\n\\nPress OK to REPLACE all current data with this backup.\\nPress Cancel to ADD it alongside what you already have.`
+    `This backup has ${data.profiles.length} kid(s) and ${data.badges.length} badge(s).\n\nPress OK to REPLACE all current data with this backup.\nPress Cancel to ADD it alongside what you already have.`
   );
   closeSheet('overlaySettings');
+  const idMap = {};
   if(mode){
     await dbClear('profiles'); await dbClear('badges');
     for(const p of data.profiles) await dbPut('profiles', p);
-    for(const b of data.badges) await dbPut('badges', b);
-    toast('Backup restored (replaced all data)');
   } else {
-    const idMap = {};
     for(const p of data.profiles){
       const newId = uuid();
       idMap[p.id] = newId;
       await dbPut('profiles', {...p, id:newId});
     }
-    for(const b of data.badges){
-      await dbPut('badges', {...b, id: uuid(), profileId: idMap[b.profileId] || b.profileId});
-    }
-    toast('Backup merged in as new kid(s)');
   }
+  // Convert base64 media back into Blobs one badge at a time, yielding periodically
+  // so a large backup doesn't lock up the page while it's being restored.
+  for(let i=0;i<data.badges.length;i++){
+    const b = data.badges[i];
+    const rec = {...b};
+    if(!mode){ rec.id = uuid(); rec.profileId = idMap[b.profileId] || b.profileId; }
+    if(typeof b.photo === 'string') rec.photo = await base64ToBlob(b.photo);
+    if(typeof b.audio === 'string') rec.audio = await base64ToBlob(b.audio);
+    await dbPut('badges', rec);
+    if(i>0 && i%8===0){
+      toast(`Restoring… ${i+1}/${data.badges.length}`);
+      await new Promise(r=>setTimeout(r));
+    }
+  }
+  toast(mode ? 'Backup restored (replaced all data)' : 'Backup merged in as new kid(s)');
   await refreshProfilesFromDB();
 });
 
@@ -976,11 +1073,38 @@ document.querySelectorAll('.overlay').forEach(ov=>{
 let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredInstallPrompt = e; });
 
+/* One-time, silent background migration: any badge saved before the storage
+   upgrade has photo/audio as a base64 string. This converts those to Blobs
+   (smaller, faster) without any action needed and without blocking the UI —
+   the app renders instantly either way thanks to mediaToSrc() above. */
+async function migrateLegacyMedia(){
+  try{
+    const flag = await dbGet('meta','migratedBlobsV1').catch(()=>null);
+    if(flag && flag.value) return false;
+    const all = await dbGetAll('badges');
+    let changed = 0;
+    for(const b of all){
+      let dirty = false;
+      const rec = {...b};
+      if(typeof b.photo === 'string'){ rec.photo = await base64ToBlob(b.photo); dirty = true; }
+      if(typeof b.audio === 'string'){ rec.audio = await base64ToBlob(b.audio); dirty = true; }
+      if(dirty){ await dbPut('badges', rec); changed++; }
+    }
+    await dbPut('meta', {key:'migratedBlobsV1', value:true});
+    return changed > 0;
+  }catch(e){
+    console.error('Legacy media migration failed', e);
+    return false;
+  }
+}
+
 (async function init(){
   try{
     db = await openDB();
     buildPickers(); updateLivePreview();
     await refreshProfilesFromDB();
+    // run in the background after first paint so old libraries load instantly
+    migrateLegacyMedia().then(changed=>{ if(changed && activeProfileId) loadBadges(); });
   }catch(err){
     toast('Could not open local storage. Try a different browser.');
     console.error(err);
